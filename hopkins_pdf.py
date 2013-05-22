@@ -4,6 +4,9 @@ import numpy as np
 # Bessel function 1st-order
 iv1 = lambda x: iv(1,x)
 
+# for rescaling log_e -> log_10
+ln10 = np.log(10)
+
 def loghopkins(rho, sigma, T):
     """
     Hopkins 2013 probability distribution:
@@ -47,7 +50,8 @@ def loghopkins(rho, sigma, T):
     term1[arg>=500] =  (-0.5 * np.log(2*np.pi*arg[arg>=500]) + arg[arg>=500])
 
     # p(rho)=0 for u<0 
-    log_rho[u>0] = (term1 + arg2 + 0.5*(np.log(lam)-np.log(u)))[u>=0]
+    # du = d(ln rho) / T
+    log_rho[u>0] = (term1 + arg2 + 0.5*(np.log(lam)-np.log(u)) - np.log(T))[u>=0]
     log_rho[u<0] = -np.inf
 
     if np.any(np.isnan(log_rho)):
@@ -88,7 +92,7 @@ def test_hopkins(savefigures=False):
     import pylab as pl
     pl.figure(1)
     pl.clf()
-    rho = np.logspace(-15,10,10000,base=np.e)
+    rho = np.logspace(-16,11,50000,base=np.e)
     sigma = 2
     Tvals = [0,0.05,0.12,0.3,0.6]
     colors = ['k',(0.2,0.0,0.8),(0.4,0.0,0.6),(0.1,0.1,0.9),(0,0.7,0.7)]
@@ -96,16 +100,17 @@ def test_hopkins(savefigures=False):
 
     for T,col,ls in zip(Tvals,colors,linestyles):
         pdist = loghopkins(rho,sigma,T)
+        pdist[pdist<-100] = -100 # plot negative infinities
         #pdist += -1-pdist[np.isfinite(pdist)].max()
-        pl.plot(np.log(rho), pdist, label="T=%0.2f" % T, color=col, linestyle=ls)
+        pl.plot(np.log(rho), pdist/ln10, label="T=%0.2f" % T, color=col, linestyle=ls)
     pl.axis([-16,11,-10,0])
     pl.xlabel("$\\ln(\\rho)$",fontsize=18)
-    pl.ylabel("$\\log(P[\\ln(\\rho)])$",fontsize=18)
+    pl.ylabel("$\\log_{10}(P[\\ln(\\rho)])$",fontsize=18)
     pl.legend(loc='best')
     pl.title("$\\sigma_{\ln(\\rho,V)}=2.0$",fontsize=18)
 
     if savefigures:
-        pl.savefig("Hopkins2013_fig1a.png")
+        pl.savefig("figures/Hopkins2013_fig1a.png")
 
     pl.figure(2)
     pl.clf()
@@ -116,16 +121,17 @@ def test_hopkins(savefigures=False):
 
     for sigma,col,ls in zip(sigmas,colors,linestyles):
         pdist = loghopkins(rho,sigma,T)
+        pdist[pdist<-100] = -100 # plot negative infinities
         #pdist += -1-pdist[np.isfinite(pdist)].max()
-        pl.plot(np.log(rho), pdist, label="$\\sigma=%0.2f$" % sigma, color=col, linestyle=ls)
-    pl.axis([-16,11,-10,0])
+        pl.plot(np.log(rho), pdist/ln10, label="$\\sigma=%0.2f$" % sigma, color=col, linestyle=ls)
+    pl.axis([-16,11,-10,1])
     pl.xlabel("$\\ln(\\rho)$",fontsize=18)
-    pl.ylabel("$\\log(P[\\ln(\\rho)])$",fontsize=18)
+    pl.ylabel("$\\log_{10}(P[\\ln(\\rho)])$",fontsize=18)
     pl.legend(loc='best')
     pl.title("T=0.12",fontsize=18)
 
     if savefigures:
-        pl.savefig("Hopkins2013_fig1b.png")
+        pl.savefig("figures/Hopkins2013_fig1b.png")
 
     pl.show()
 
