@@ -7,7 +7,7 @@ iv1 = lambda x: iv(1,x)
 # for rescaling log_e -> log_10
 ln10 = np.log(10)
 
-def loghopkins(rho, sigma, T, meanrho=1):
+def loghopkins(rho, sigma, T, meanrho=1, soften=False):
     """
     Hopkins 2013 probability distribution:
     :math:`P_V(\ln(\rho)) d \ln(\rho) = I_1 (2 \sqrt{\lambda u}) \exp\left[-(\lambda+u)] \sqrt{\frac{\lambda}{u}} \d u`
@@ -53,6 +53,8 @@ def loghopkins(rho, sigma, T, meanrho=1):
     # du = d(ln rho) / T
     log_rho[u>0] = (term1 + arg2 + 0.5*(np.log(lam)-np.log(u)) - np.log(T))[u>0]
     log_rho[u<=0] = -np.inf
+    if soften:
+        log_rho += (-lam)*np.exp(-(u**2/(2*(0.01*T)**2)))
 
     if np.any(np.isnan(log_rho)):
         raise ValueError("A value is NaN; this should not happen!")
@@ -215,6 +217,49 @@ def test_hopkins(savefigures=False):
 
     if savefigures:
         pl.savefig("figures/Hopkins_MassPDFVsMeanMass.png")
+
+    pl.figure(6)
+    pl.clf()
+    rho = np.exp(np.linspace(0.6,1.4,50000))
+    sigma = 2
+    Tvals = [0.9, 1.0, 1.1]
+
+    for T in Tvals:
+        pdist = loghopkins(rho,sigma,T,soften=False)
+        pdistS = loghopkins(rho,sigma,T,soften=True)
+        pdist[pdist<-100] = -100 # plot negative infinities
+        #pdist += -1-pdist[np.isfinite(pdist)].max()
+        pl.plot(np.log(rho), pdist/ln10, label="T=%0.2f" % T)
+        pl.plot(np.log(rho), pdistS/ln10, label="T=%0.2f soft" % T)
+    pl.axis([0.6,1.4,-1,0])
+    pl.xlabel("$\\ln(\\rho)$",fontsize=18)
+    pl.ylabel("$\\log_{10}(P[\\ln(\\rho)])$ Softened",fontsize=18)
+    pl.legend(loc='best')
+    pl.title("$\\sigma_{\ln(\\rho,V)}=2.0$",fontsize=18)
+
+    if savefigures:
+        pl.savefig("figures/hopkins_soften_test.png")
+
+    sigma = 2
+    rho = np.logspace(-50,35,50000,base=np.e)
+    dlnrho = np.diff(np.log(rho)).mean()
+    Tvals = np.linspace(0,3,100)
+    integral = [(np.exp(loghopkins(rho,2,T,soften=False))*rho*dlnrho).sum() for T in Tvals]
+    soft_integral = [(np.exp(loghopkins(rho,2,T,soften=True))*rho*dlnrho).sum() for T in Tvals]
+    pl.rc('font',size=18)
+    pl.figure(7)
+    pl.clf()
+    pl.plot(Tvals,integral,label="Integral")
+    pl.plot(Tvals,soft_integral,label="Softened Integral")
+    pl.plot(Tvals,integral+np.exp(-sigma**2/(2*Tvals**2)),label="Integral + $e^{-\\lambda}$")
+    pl.legend(loc='best')
+    pl.xlabel("T")
+    pl.ylabel("$\\int_{-\infty}^{\infty} P_V d \\ln \\rho$")
+
+    if savefigures:
+        pl.savefig("figures/hopkins_integrals.png")
+
+
 
     pl.show()
 
