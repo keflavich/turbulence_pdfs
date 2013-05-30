@@ -1,6 +1,7 @@
 from scipy.special import iv
 import numpy as np
 
+
 # Bessel function 1st-order
 iv1 = lambda x: iv(1,x)
 
@@ -272,7 +273,7 @@ def test_hopkins(savefigures=False):
     # integral( rho exp(-lambda) delta(u) d rho/(rho* T)
     # = exp(-lambda)/T integral(delta(u) d rho)
     # = exp(-lambda)/T
-    pl.plot(Tvals,mass_integral+np.exp(-sigma**2/(2*Tvals**2))/Tvals,label="Integral + $e^{-\\lambda}$")
+    pl.plot(Tvals,mass_integral+np.exp(-sigma**2/(2*Tvals**2))*Tvals,label="Integral + $e^{-\\lambda}$")
     pl.legend(loc='best')
     pl.xlabel("T")
     pl.ylabel("$\\int_{-\infty}^{\infty} \\rho P_V d \\ln \\rho = \\rho_0$")
