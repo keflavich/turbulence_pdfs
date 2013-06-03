@@ -141,25 +141,41 @@ def moments(rho, sigma, T, meanrho=1):
     logrho = np.log(rho)
     dlogrho = np.diff(logrho)[0]
 
-    expectation = (rho*distribution*dlogrho).sum()
-    logexpectation = (logrho*distribution*dlogrho).sum()
+    E_rho = (rho*distribution*dlogrho).sum()
+    E_logrho = (logrho*distribution*dlogrho).sum()
+    E_rhosq = (rho**2 * distribution*dlogrho).sum()
+    E_logrhosq = (logrho**2*distribution*dlogrho).sum()
+    E_rhocube = (rho**3*distribution*dlogrho).sum()
 
     mass_distribution = rho*distribution
     massexpectation = (rho*mass_distribution*dlogrho).sum()
     logmassexpectation = (logrho*mass_distribution*dlogrho).sum()
+    E_rhologrhosq = (logrho**2*mass_distribution*dlogrho).sum()
 
-    return {'<rho>_V': expectation,
-            '<ln rho>_V': logexpectation,
-            'S_rho,V': ( (rho-expectation)**2 * distribution * dlogrho ).sum(), 
-            'S_logrho,V': ( (logrho-logexpectation)**2 * distribution * dlogrho ).sum(), 
+    if T != 0:  # add delta-function term
+        lam = sigma**2/(2*T**2)
+        E_rho += meanrho * np.exp(-lam)
+        E_rhosq += meanrho**2 * np.exp(lam*(T-1)/(T+1))
+        E_rhocube += meanrho**3 * np.exp(lam*(2*T-1)/(T+1))
+        massexpectation += np.exp(-lam*(1/(1+T)))
+        E_logrho += np.exp(-lam) * (np.log(meanrho) + (lam*T)/(1+T))
+        E_logrhosq += np.exp(-lam) * (np.log(meanrho) + (lam*T)/(1+T))**2
+        logmassexpectation += np.exp(-lam/(1+T)) * meanrho * (np.log(meanrho)+(lam*T/(1+T)))
+        E_rhologrhosq += (np.log(meanrho)+(lam*T/(1+T)))**2 * meanrho * np.exp(-lam/(1+T))
+
+    return {'<rho>_V': E_rho,
+            '<ln rho>_V': E_logrho,
+            #'S_rho,Vb': ( (rho-E_rho)**2 * distribution * dlogrho ).sum(), 
+            'S_rho,V' : massexpectation - E_rho**2,
+            'S_logrho,V': E_logrhosq - E_logrho**2, #( (logrho-E_logrho)**2 * distribution * dlogrho ).sum(), 
             '<rho>_M': massexpectation, 
-            '<ln rho>_M': (logrho*mass_distribution*dlogrho).sum(),
-            'S_rho,M': ( rho**2 * mass_distribution*dlogrho ).sum() - massexpectation**2, 
-            'S_logrho,M': (logrho**2 * mass_distribution*dlogrho).sum() - logmassexpectation**2, 
+            '<ln rho>_M': E_logrho, #(logrho*mass_distribution*dlogrho).sum(),
+            'S_rho,M': E_rhocube - massexpectation**2, #( rho**2 * mass_distribution*dlogrho ).sum() - massexpectation**2, 
+            'S_logrho,M': E_rhologrhosq - logmassexpectation**2, #(logrho**2 * mass_distribution*dlogrho).sum() - logmassexpectation**2, 
             }
 
-def moments_theoretical_lognormal(rho,sigma,T):
-    return {'<rho>_V': 1,
+def moments_theoretical_lognormal(rho,sigma,T,meanrho=1):
+    return {'<rho>_V': meanrho,
             '<ln rho>_V': -sigma**2/2.,
             'S_rho,V': np.exp(sigma**2) - 1,
             'S_logrho,V': sigma**2,
@@ -169,12 +185,48 @@ def moments_theoretical_lognormal(rho,sigma,T):
             'S_logrho,M': sigma**2,
             }
 
-def moments_theoretical_hopkins(rho,sigma,T):
-    return {'<rho>_V': 1,
-            '<ln rho>_V': -(sigma**2)/2. * (1/(1+T)),
-            'S_rho,V': np.exp(sigma**2/(1+3*T+2*T**2)) - 1,
-            'S_logrho,V': sigma**2,
-            '<rho>_M': np.exp(sigma**2/(1+3*T+2*T**2)),
+def moments_theoretical_hopkins(rho,sigma,T,meanrho=1):
+    E_rho = meanrho
+    # have to simplify out lambda, since it can be zero
+    # lam = sigma**2/(2*T**2)
+    E_rhosq = meanrho**2 * np.exp(sigma**2/(1+3*T+2*T**2))
+    # E_logrho = log(rho_0) - lambda t**2 / (1+T)
+    E_logrho = np.log(meanrho) - sigma**2/(2*(1+T))
+    # computed in mathematica, including the Delta-function term
+    # expanded as such to avoid 1/T -> 1/0 errors
+    # There are some terms that are e^(-1/t^2) / t, which should be 0 for T=0
+    E_logrhosq_terms = [
+             sigma**2/(1 + T)**2,
+             (2*T*sigma**2)/(1 + T)**2 ,
+             (T**2*sigma**2)/(1 + T)**2 ,
+             sigma**4/( 4*(1 + T)**2) ,
+             -(sigma**2*np.log(meanrho))/(1 + T)**2 ,
+             -(T*sigma**2*np.log(meanrho))/(1 + T)**2 ,
+             np.exp(-(sigma**2/(2*T**2)))*np.log(meanrho)**2 ,
+             np.log(meanrho)**2/(1 + T)**2 ,
+             (2*T*np.log(meanrho)**2)/(1 + T)**2 ,
+             (T**2*np.log(meanrho)**2)/(1 + T)**2 ,
+        ]
+    if T != 0:
+        # these will raise errors if T == 0
+        # They are 0 if T == 0
+        E_logrhosq_terms += [
+             (np.exp(-(sigma**2/(2*T**2)))*sigma**2*np.log(meanrho))/(T*(1 + T)),
+             -(np.exp(-(sigma**2/(2*T**2))) * sigma**2*np.log(meanrho))/(T*(1 + T)**2) ,
+             -(np.exp(-(sigma**2/(2*T**2))) * sigma**2*np.log(meanrho))/(1 + T)**2 ,
+             -(np.exp(-(sigma**2/(2*T**2)))*np.log(meanrho)**2)/(1 + T)**2 ,
+             -(2*np.exp(-(sigma**2/(2*T**2)))*T*np.log(meanrho)**2)/(1 + T)**2 ,
+             -(np.exp(-(sigma**2/(2*T**2)))*T**2*np.log(meanrho)**2)/(1 + T)**2,
+             ]
+    E_logrhosq = np.sum(E_logrhosq_terms)
+
+    return {'<rho>_V': E_rho,  # 1
+            '<ln rho>_V': E_logrho, #-(sigma**2)/2. * (1/(1+T)),
+            # E[rhosq] - E[rho]^2
+            'S_rho,V': E_rhosq-E_rho**2, # np.exp(sigma**2/(1+3*T+2*T**2)) - 1,
+            # E[logrhosq] - E[logrho]^2
+            'S_logrho,V': E_logrhosq - E_logrho**2, # sigma**2,
+            '<rho>_M': E_rhosq,  #np.exp(sigma**2/(1+3*T+2*T**2)),
             '<ln rho>_M': sigma**2/2. * (1+T)**-2,
             'S_rho,M': np.exp(3*sigma**2/(1+4*T+3*T**2)) - np.exp(2*sigma**2/(1+3*T+2*T**2)),
             'S_logrho,M': sigma**2 * (1+T)**-3,
