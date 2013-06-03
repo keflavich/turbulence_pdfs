@@ -9,7 +9,7 @@ iv1 = lambda x: iv(1,x)
 ln10 = np.log(10)
 
 def loghopkins(rho, sigma, T, meanrho=1, soften=False):
-    """
+    r"""
     Hopkins 2013 probability distribution:
     :math:`P_V(\ln(\rho)) d \ln(\rho) = I_1 (2 \sqrt{\lambda u}) \exp\left[-(\lambda+u)] \sqrt{\frac{\lambda}{u}} \d u`
 
@@ -64,8 +64,8 @@ def loghopkins(rho, sigma, T, meanrho=1, soften=False):
     return log_rho
 
 
-def hopkins(rho, sigma, T):
-    """
+def hopkins(rho, sigma, T, meanrho=1.0, normalize=True):
+    r"""
     Hopkins 2013 probability distribution:
     :math:`P_V(\ln(\rho)) d \ln(\rho) = I_1 (2 \sqrt{\lambda u}) \exp\left[-(\lambda+u)] \sqrt{\frac{\lambda}{u}} \d u`
 
@@ -84,12 +84,19 @@ def hopkins(rho, sigma, T):
         The adjustable parameter of the Hopkins distribution.  If T=0, a
         lognormal distribution will be used in place of the Hopkins
         distribution (to avoid divide-by-zero errors)
+    normalize : bool
+        If true, will normalize the returned array such that its sum is 1
+        (rather than its integral)
 
     Returns
     -------
     The probability of the density, with integral = 1
     """
-    return np.exp(loghopkins(rho,sigma,T))
+    P_V = np.exp(loghopkins(rho,sigma,T, meanrho=meanrho))
+    if normalize:
+        return P_V/P_V.sum()
+    else:
+        return P_V
 
 def hopkins_masspdf(rho, sigma_M, T):
     """
@@ -105,11 +112,73 @@ def loghopkins_masspdf(rho, sigma_M, T):
     sigma = sigma_M * (1+T)**3
     return (loghopkins(rho,sigma,T))
 
-def hopkins_masspdf_ofmeandens(rho, meanrho, T):
-    sigma_M = np.sqrt( np.log(meanrho) * (1+3*T+2*T**2)/(1+T)**3)
-    sigma = sigma_M * (1+T)**3
-    return np.exp(loghopkins(rho,sigma,T))
+def hopkins_masspdf_ofmeandens(rho, vol_meanrho, sigma_volume, T, normalize=True):
+    r"""
+    Return the *mass-weighted* PDF
 
+    .. math::
+
+        P_M(\ln \rho) = \rho P_V(\ln \rho)
+
+    Parameters
+    ----------
+    normalize : bool
+        Re-normalize such that the *sum* of the probabilities = 1
+    """
+    # don't bother normalizing at this step; just adds cost.
+    P_M = rho * hopkins(rho/vol_meanrho,sigma_volume,T,normalize=False)
+    if normalize:
+        return P_M/P_M.sum()
+    else:
+        return P_M
+
+
+def moments(rho, sigma, T, meanrho=1):
+    distribution = hopkins(rho=rho, sigma=sigma, T=T, meanrho=meanrho, normalize=False)
+
+    # because the mass distribution is normalized, we have integral(f(x) dx) = 1 -> sum(f(x))=1
+    #drho = np.concatenate([[0],np.diff(rho)])
+    logrho = np.log(rho)
+    dlogrho = np.diff(logrho)[0]
+
+    expectation = (rho*distribution*dlogrho).sum()
+    logexpectation = (logrho*distribution*dlogrho).sum()
+
+    mass_distribution = rho*distribution
+    massexpectation = (rho*mass_distribution*dlogrho).sum()
+    logmassexpectation = (logrho*mass_distribution*dlogrho).sum()
+
+    return {'<rho>_V': expectation,
+            '<ln rho>_V': logexpectation,
+            'S_rho,V': ( (rho-expectation)**2 * distribution * dlogrho ).sum(), 
+            'S_logrho,V': ( (logrho-logexpectation)**2 * distribution * dlogrho ).sum(), 
+            '<rho>_M': massexpectation, 
+            '<ln rho>_M': (logrho*mass_distribution*dlogrho).sum(),
+            'S_rho,M': ( rho**2 * mass_distribution*dlogrho ).sum() - massexpectation**2, 
+            'S_logrho,M': (logrho**2 * mass_distribution*dlogrho).sum() - logmassexpectation**2, 
+            }
+
+def moments_theoretical_lognormal(rho,sigma,T):
+    return {'<rho>_V': 1,
+            '<ln rho>_V': -sigma**2/2.,
+            'S_rho,V': np.exp(sigma**2) - 1,
+            'S_logrho,V': sigma**2,
+            '<rho>_M': np.exp(sigma**2),
+            '<ln rho>_M': sigma**2/2.,
+            'S_rho,M': np.exp(3*sigma**2) - np.exp(2*sigma**2),
+            'S_logrho,M': sigma**2,
+            }
+
+def moments_theoretical_hopkins(rho,sigma,T):
+    return {'<rho>_V': 1,
+            '<ln rho>_V': -(sigma**2)/2. * (1/(1+T)),
+            'S_rho,V': np.exp(sigma**2/(1+3*T+2*T**2)) - 1,
+            'S_logrho,V': sigma**2,
+            '<rho>_M': np.exp(sigma**2/(1+3*T+2*T**2)),
+            '<ln rho>_M': sigma**2/2. * (1+T)**-2,
+            'S_rho,M': np.exp(3*sigma**2/(1+4*T+3*T**2)) - np.exp(2*sigma**2/(1+3*T+2*T**2)),
+            'S_logrho,M': sigma**2 * (1+T)**-3,
+            }
 
 def test_hopkins(savefigures=False):
     import pylab as pl
@@ -203,10 +272,11 @@ def test_hopkins(savefigures=False):
     pl.figure(5)
     pl.clf()
     T = 0.12
+    sigma = 1.0
     meanrhos = 10**(np.arange(2,8))
     rho = np.logspace(-36,31,50000,base=np.e)
     for meanrho,col,ls in zip(meanrhos,colors,linestyles):
-        pdist = hopkins_masspdf_ofmeandens(rho, meanrho, T)
+        pdist = hopkins_masspdf_ofmeandens(rho, meanrho, sigma_volume=sigma, T=T)
         #pdist[pdist<-100] = -100 # plot negative infinities
         #pdist += -1-pdist[np.isfinite(pdist)].max()
         pl.plot(np.log(rho), np.log10(pdist), label="$<\\rho>_M=%0.2g$" % meanrho, color=col, linestyle=ls)
@@ -273,7 +343,7 @@ def test_hopkins(savefigures=False):
     # integral( rho exp(-lambda) delta(u) d rho/(rho* T)
     # = exp(-lambda)/T integral(delta(u) d rho)
     # = exp(-lambda)/T
-    pl.plot(Tvals,mass_integral+np.exp(-sigma**2/(2*Tvals**2))*Tvals,label="Integral + $e^{-\\lambda}$")
+    pl.plot(Tvals,mass_integral+np.exp(-sigma**2/(2*Tvals**2)*(1/(1+Tvals))),label="Integral + $e^{-\\lambda}$")
     pl.legend(loc='best')
     pl.xlabel("T")
     pl.ylabel("$\\int_{-\infty}^{\infty} \\rho P_V d \\ln \\rho = \\rho_0$")
@@ -283,4 +353,4 @@ def test_hopkins(savefigures=False):
 
     pl.show()
 
-
+    return locals()
