@@ -202,7 +202,6 @@ def moments_theoretical_hopkins(rho,sigma,T,meanrho=1):
              sigma**4/( 4*(1 + T)**2) ,
              -(sigma**2*np.log(meanrho))/(1 + T)**2 ,
              -(T*sigma**2*np.log(meanrho))/(1 + T)**2 ,
-             np.exp(-(sigma**2/(2*T**2)))*np.log(meanrho)**2 ,
              np.log(meanrho)**2/(1 + T)**2 ,
              (2*T*np.log(meanrho)**2)/(1 + T)**2 ,
              (T**2*np.log(meanrho)**2)/(1 + T)**2 ,
@@ -217,6 +216,7 @@ def moments_theoretical_hopkins(rho,sigma,T,meanrho=1):
              -(np.exp(-(sigma**2/(2*T**2)))*np.log(meanrho)**2)/(1 + T)**2 ,
              -(2*np.exp(-(sigma**2/(2*T**2)))*T*np.log(meanrho)**2)/(1 + T)**2 ,
              -(np.exp(-(sigma**2/(2*T**2)))*T**2*np.log(meanrho)**2)/(1 + T)**2,
+             np.exp(-(sigma**2/(2*T**2)))*np.log(meanrho)**2 ,
              ]
     E_logrhosq = np.sum(E_logrhosq_terms)
 
