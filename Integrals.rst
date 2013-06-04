@@ -1,11 +1,21 @@
 Hopkins PDF Generalization
-==========================
+##########################
+:date: 2013-06-04 15:00
+:author: Adam (keflavich@gmail.com)
+:tags: turbulence
+
+`Hopkins 2013`_ presents a non-lognormal form of the probability distribution
+function of density in turbulence, depending primarily on a parameter
+:math:`T`.  I examine some of its properties here.
+
 The conservation equations, conservation of probability and mass
+
 .. math:: \int_{-\infty}^\infty P_V(\ln \rho) d \ln \rho \equiv 1
+
 .. math:: \int_{-\infty}^\infty\rho P_V(\ln \rho) d \ln \rho \equiv \rho_0 = 1
 
-The :math:`=1` is the definition used by Hopkins 2013.  Part of the goal of this document
-is to generalize to :math:`\rho_0 != 1`
+The :math:`=1` is the definition used by `Hopkins 2013`_.  Part of the goal of this document
+is to generalize to :math:`\rho_0 <> 1`
 
 The most important thing to do is determine the values of the moments of the distribution, including
 the integral corrections for the Dirac Delta function component of the PDF.
@@ -14,21 +24,24 @@ The PDF
 -------
 The full form of the Hopkins PDF is 
 
-.. math:: P_V(\ln \rho) d \ln \rho =  \left[I_1(2\sqrt{\lambda u}) e^{-\lambda-u} \sqrt{\frac{\lambda}{u}} + e^{-\lambda} \delta(u)\right]du
+.. math:: P_V(\ln \rho/\rho_0) d \ln \rho =  \left[I_1(2\sqrt{\lambda u}) e^{-\lambda-u} \sqrt{\frac{\lambda}{u}} + e^{-\lambda} \delta(u)\right]du
 
-The mass-weighted PDF is simply
+The mass-weighted PDF is 
 
-.. math:: P_M(\ln \rho) d \ln \rho =  \rho \left[I_1(2\sqrt{\lambda u}) e^{-\lambda-u} \sqrt{\frac{\lambda}{u}} + e^{-\lambda} \delta(u)\right]du
+.. math:: P_M(\ln \rho/\rho_0) d \ln \rho =  \frac{\rho}{\rho_0} \left[I_1(2\sqrt{\lambda u}) e^{-\lambda-u} \sqrt{\frac{\lambda}{u}} + e^{-\lambda} \delta(u)\right]du
 
 With definitions:
 
-.. math:: u\equiv \frac{\lambda}{1+T} - \frac{\ln \rho}{T}  ;  (u \geq 0)
+.. math:: u\equiv \frac{\lambda}{1+T} - \frac{\ln \rho/\rho_0}{T}  ;  (u \geq 0)
 .. math:: \lambda \equiv \frac{S_{\ln \rho,V}}{2 T^2}
 
+The ratio :math:`\rho/\rho_0` is needed to ensure self-consistency: the mass
+PDF must also conserve probability, which means it must be scaled by
+:math:`1/\rho_0`.
 
-But note that both of these distributions can depend on :math:`\rho_0`, changing :math:`u` to be
-
-.. math:: u\equiv \frac{\lambda}{1+T} - \frac{\ln (\rho/\rho_0)}{T}  ;  (u \geq 0)
+.. But note that both of these distributions can depend on :math:`\rho_0`, changing :math:`u` to be
+.. 
+.. .. math:: u\equiv \frac{\lambda}{1+T} - \frac{\ln (\rho/\rho_0)}{T}  ;  (u \geq 0)
 
 
 Moment equations
@@ -52,11 +65,20 @@ Also, :math:`S_{\ln \rho,V} \equiv V[\ln \rho_V]`
 
 .. math:: <\ln \rho>_M \equiv \int_{-\infty}^{\infty} \ln \rho (\rho P_V(\ln \rho/\rho_0)) d \ln \rho
 
+.. math:: <\rho^3>_V \equiv \int_{-\infty}^{\infty} \rho^3 P_V(\ln \rho/\rho_0) d \ln \rho
 
+.. math:: <\ln^2 \rho>_V \equiv \int_{-\infty}^{\infty} (\ln \rho)^2 P_V(\ln \rho/\rho_0)d \ln \rho
+
+.. math:: <\ln^2 \rho>_M \equiv \int_{-\infty}^{\infty} (\ln \rho)^2 \rho P_V(\ln \rho/\rho_0)d \ln \rho
+
+In the moment equations, only the input to the PDF is scaled by a mean density
+:math:`\rho_0`; the "weighting factors" for the expectation value are not
+(i.e., we are measuring :math:`E[\rho]`, not :math:`E[\rho/rho_0]`).
 
 Delta terms
 ~~~~~~~~~~~
-These can be integrated analytically
+These can be integrated analytically.  In this section, I am just computing the
+means; the variances are more complicated.
 
 .. math:: <\rho>_V \equiv \rho_0 \equiv \int_{-\infty}^{\infty} \rho e^{-\lambda} \delta(\frac{\lambda}{1+T} - \frac{\ln\rho/\rho_0}{T}) \frac{d \ln \rho}{T}
 
@@ -65,8 +87,6 @@ These can be integrated analytically
 .. math:: <\rho>_M \equiv \int_{-\infty}^{\infty} \rho (\rho e^{-\lambda} \delta(\frac{\lambda}{1+T} - \frac{\ln\rho/\rho_0}{T})) \frac{d \ln \rho}{T}
 
 .. math:: <\ln \rho>_M \equiv \int_{-\infty}^{\infty} \ln \rho (\rho e^{-\lambda} \delta(\frac{\lambda}{1+T} - \frac{\ln\rho/\rho_0}{T})) \frac{d \ln \rho}{T}
-
-
 
 Substitution: :math:`v=\frac{\ln \rho/\rho_0}{T}`,
 :math:`dv = \frac{1}{T} d \ln \rho`, :math:`\rho=\rho_0 e^{v*T}`, :math:`\ln \rho = v T + \ln \rho_0`
@@ -83,16 +103,24 @@ Substitution: :math:`v=\frac{\ln \rho/\rho_0}{T}`,
 
 Solutions:
 
-.. math:: <\rho>_{V\delta} = - \rho_0 \exp\left[\frac{T \lambda }{1+T} - \lambda\right] = - \rho_0 \exp\left[-\lambda \frac{1}{1+T}\right]
+.. math:: <\rho>_{V\delta} =  \rho_0 \exp\left[\frac{T \lambda }{1+T} - \lambda\right] =  \rho_0 \exp\left[-\lambda \frac{1}{1+T}\right]
 
-.. math:: <\ln \rho>_{V\delta} = - e^{-\lambda} \frac{\lambda T}{1+T} - e^{-\lambda} \ln \rho_0
+.. math:: <\ln \rho>_{V\delta} =  e^{-\lambda} \frac{\lambda T}{1+T} + e^{-\lambda} \ln \rho_0
 
-.. math:: <\rho>_{M\delta} = - \rho_0^2 \exp\left[\frac{2 T \lambda }{1+T} - \lambda\right] = - \rho_0^2 \exp\left[\lambda\frac{T-1}{T+1}\right]
+.. math:: <\rho>_{M\delta} =  \rho_0^2 \exp\left[\frac{2 T \lambda }{1+T} - \lambda\right] = \rho_0^2 \exp\left[\lambda\frac{T-1}{T+1}\right]
 
-.. math:: <\ln \rho>_{M\delta} = - \rho_0  \left( \frac{\lambda T}{1+T} + \ln \rho_0 \right) \exp\left[\frac{T \lambda }{1+T} - \lambda\right]
-.. math::                      = - \rho_0 \left( \frac{\lambda T}{1+T} + \ln \rho_0 \right) \exp\left[\frac{ \lambda (T-1) }{T+1}\right] 
+.. math:: <\ln \rho>_{M\delta} = \rho_0  \left( \frac{\lambda T}{1+T} + \ln \rho_0 \right) \exp\left[\frac{T \lambda }{1+T} - \lambda\right]
+.. math::                      = \rho_0 \left( \frac{\lambda T}{1+T} + \ln \rho_0 \right) \exp\left[\frac{ -\lambda }{T+1}\right] 
 
-Using :math:`\rho_0=1` as defined in Hopkins 2013 simplifies all of these a great deal.
+(for these next 3, I skipped intermediate steps)
+
+.. math:: <\rho^3>_{V\delta} =  \rho_0^3 \exp\left[\frac{3 T \lambda }{1+T} - \lambda\right] = \rho_0^3 \exp\left[\lambda\frac{2T-1}{T+1}\right]
+
+.. math:: <\ln^2 \rho>_{M\delta} = \rho_0 \left( \frac{\lambda T}{1+T} + \ln \rho_0 \right)^2 \exp\left[\frac{ -\lambda }{T+1}\right] 
+
+.. math:: <\ln^2 \rho>_{V\delta} = \left( \frac{\lambda T}{1+T} + \ln \rho_0 \right)^2 e^{-\lambda}
+
+Using :math:`\rho_0=1` as defined in `Hopkins 2013`_ simplifies all of these a great deal.
 
 
 PDF Integrals
@@ -142,20 +170,28 @@ above.
 
 The same general approach can be followed for all expectation values, but we'll skip the detailed algebra.
 
-Expectation Value of the Mass-Weighted Density :math:`E[\rho^2]`
+Expectation Value of the Mass-Weighted Density :math:`E_M[\rho]`
 ````````````````````````````````````````````````````````````````
-.. math:: E[\rho^2] = \rho_0^2 \left[ \exp\left(\lambda\frac{2 T^2}{1+3T+2T^2}\right) - \exp\left(\lambda\frac{T-1}{T+1}\right) + \exp\left(\lambda\frac{T-1}{T+1}\right) \right]
+.. math:: E[\rho^2] = \rho_0 \left[ \exp\left(\lambda\frac{2 T^2}{1+3T+2T^2}\right) - \exp\left(\lambda\frac{T-1}{T+1}\right) + \exp\left(\lambda\frac{T-1}{T+1}\right) \right]
 
 The right 2 terms cancel, yielding the value shown in Equation 7 of Hopkins
 2013 scaled by :math:`\rho_0^2`.  However, the right-most term is the
 correction factor from the Dirac Delta term needed to correct any
 numerical computation of the mass-weighted density.
 
-Variance of the Volume-Weighted Density :math:`V[\rho]`
-```````````````````````````````````````````````````````
+Variance of the Volume-Weighted Density :math:`V[\rho]=S_{\ln \rho,V}`
+``````````````````````````````````````````````````````````````````````
 
 .. math:: V[\rho] = E[\rho^2] - E[\rho]^2 = \rho_0^2 \left[  \exp\left(\lambda\frac{2 T^2}{1+3T+2T^2}\right) - 1 \right]
 
 However, the "correction factor" is still important:
 
 .. math:: V_\delta[\rho] = \rho_0^2 \left[ \exp\left(\lambda\frac{T-1}{T+1}\right) - \exp\left(-2\frac{\lambda}{1+T}\right) \right]
+
+
+Expectation Value of the Volume-Weighted Log Density :math:`E[\rho]`
+````````````````````````````````````````````````````````````````
+
+
+
+.. _Hopkins 2013: http://adsabs.harvard.edu/abs/2013MNRAS.430.1880H

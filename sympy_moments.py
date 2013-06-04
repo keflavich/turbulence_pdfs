@@ -24,6 +24,9 @@ def hopkins(u):
 def rho(x):
     return rho0*sm.exp(T*(x**2/(4*L)+L/(1+T)))
 
+def logrho(x):
+    return sm.log(rho0) + T*(x**2/(4*L)+L/(1+T))
+
 def expectation(var, intvar, function=besselgaussian):
     expr = var * besselgaussian(intvar)
     return sm.simplify( sm.integrate(expr,(intvar,0,sm.oo), conds='none') )
@@ -36,7 +39,7 @@ if __name__ == "__main__":
     print "E[rho^3] = ",expectation(rho(x)**3,x)
     import sys
     sys.setrecursionlimit(5000)
-    logrho = sm.simplify(sm.log(rho(x)))
+    logrho = sm.simplify(logrho())
     print "E[log(rho)] = ",expectation(logrho,x)
     print "E[log(rho)^2] = ",expectation(logrho**2,x)
     print "E[rho log(rho)] = ",expectation(rho(x)*logrho,x)
