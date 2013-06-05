@@ -81,11 +81,11 @@ for mm,signum in enumerate([1,3]):
         for jj,T in enumerate(Tvals):
             pl.subplot(2,4,ii+1)
             if 'ln' in k or 'log' in k:
-                L = pl.semilogx(meanrhos, grid[k][:,signum,jj],      marker='x', linewidth=2, alpha=0.5, label=r'$T=%0.1g$' % T)
+                L = pl.semilogx(meanrhos, grid[k][:,signum,jj],      marker='x', linewidth=2, alpha=0.5, label=r'$T=%0.2g$' % T)
                 color = L[0].get_color()
                 pl.semilogx(meanrhos, real_grid[k][:,signum,jj], marker='+', linewidth=2, alpha=0.5, linestyle='--', color=color)
             else:
-                L = pl.loglog(meanrhos, (grid[k][:,signum,jj]),      linewidth=2, alpha=0.5, marker='x', linestyle='-', label=r'$T=%0.1g$' % T)
+                L = pl.loglog(meanrhos, (grid[k][:,signum,jj]),      linewidth=2, alpha=0.5, marker='x', linestyle='-', label=r'$T=%0.2g$' % T)
                 color = L[0].get_color()
                 pl.loglog(meanrhos, (real_grid[k][:,signum,jj]), linewidth=2, alpha=0.5, marker='+', linestyle='--', color=color)
             if 'S' not in k and 'ln' not in k:
@@ -117,8 +117,10 @@ for nn,Tnum in enumerate([0,1,4]):
                 color = L[0].get_color()
                 pl.loglog(sigmas, (real_grid[k][jj,:,Tnum]), linewidth=2, alpha=0.5, marker='+', linestyle='--', color=color)
             if k in ('S_logrho,V','S_logrho,M'):
-                xvals = np.linspace(*pl.gca().get_ylim())
+                ylim = pl.gca().get_ylim()
+                xvals = np.linspace(*pl.gca().get_xlim())
                 pl.plot(xvals,xvals**2,'k:',alpha=0.5)
+                pl.gca().set_ylim(*ylim)
         pl.ylabel(pretty_labels[k], fontsize=18)
         pl.xlabel("$\\sigma_V$", fontsize=18)
     
