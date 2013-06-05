@@ -51,7 +51,7 @@ def loghopkins(rho, sigma, T, meanrho=1, soften=False):
     term1[arg>=500] =  (-0.5 * np.log(2*np.pi*arg[arg>=500]) + arg[arg>=500])
 
     # p(rho)=0 for u<0 
-    # du = d(ln rho) / T
+    # du = - d(ln rho) / T
     log_rho[u>0] = (term1 + arg2 + 0.5*(np.log(lam)-np.log(u)) - np.log(T))[u>0]
     log_rho[u<=0] = -np.inf
     if soften:
@@ -146,8 +146,8 @@ def moments(rho, sigma, T, meanrho=1):
     E_rhosq = (rho**2 * distribution*dlogrho).sum()
     E_logrhosq = (logrho**2*distribution*dlogrho).sum()
 
-    mass_distribution = rho*distribution
-    # massexpectation = E_rhosq
+    mass_distribution = rho/meanrho*distribution
+    #print "DEBUG: distribution.sum(): ",(distribution*dlogrho).sum()," massdistribution.sum(): ",(mass_distribution*dlogrho).sum()
     E_M_logrho = (logrho*mass_distribution*dlogrho).sum()
     E_M_logrhosq = (logrho**2*mass_distribution*dlogrho).sum()
     E_M_rho = (rho*mass_distribution*dlogrho).sum()
@@ -157,13 +157,13 @@ def moments(rho, sigma, T, meanrho=1):
         lam = sigma**2/(2*T**2)
         E_rho += meanrho * np.exp(-lam/(1+T))
         E_rhosq += meanrho**2 * np.exp(lam*(T-1)/(T+1))
-        E_M_rho += meanrho * np.exp(lam*(T-1)/(T+1))
+        E_M_rho += meanrho    * np.exp(lam*(T-1)/(T+1))
         E_M_rhosq += meanrho**2 * np.exp(lam*(2*T-1)/(T+1))
         E_logrho += np.exp(-lam) * (np.log(meanrho) + (lam*T)/(1+T))
         E_logrhosq += np.exp(-lam) * (np.log(meanrho) + (lam*T)/(1+T))**2
         #logmassexpectation += np.exp(-lam/(1+T)) * meanrho * (np.log(meanrho)+(lam*T/(1+T)))
-        E_M_logrho += meanrho * (lam*T/(1+T) + np.log(meanrho)) * np.exp(-lam/(T+1))
-        E_M_logrhosq += (np.log(meanrho)+(lam*T/(1+T)))**2 * meanrho * np.exp(-lam/(1+T))
+        E_M_logrho += (lam*T/(1+T) + np.log(meanrho)) * np.exp(-lam/(T+1))
+        E_M_logrhosq += (np.log(meanrho)+(lam*T/(1+T)))**2 * np.exp(-lam/(1+T))
 
     return {'<rho>_V': E_rho,
             '<ln rho>_V': E_logrho,
@@ -192,6 +192,7 @@ def moments_theoretical_hopkins(rho,sigma,T,meanrho=1):
     # have to simplify out lambda, since it can be zero
     # lam = sigma**2/(2*T**2)
     E_rhosq = meanrho**2 * np.exp(sigma**2/(1+3*T+2*T**2))
+    E_M_rho = meanrho    * np.exp(sigma**2/(1+3*T+2*T**2))
     # E_logrho = log(rho_0) - lambda t**2 / (1+T)
     E_logrho = np.log(meanrho) - sigma**2/(2*(1+T))
     # computed in mathematica, including the Delta-function term
@@ -221,6 +222,7 @@ def moments_theoretical_hopkins(rho,sigma,T,meanrho=1):
              np.exp(-(sigma**2/(2*T**2)))*np.log(meanrho)**2 ,
              ]
     E_logrhosq = np.sum(E_logrhosq_terms)
+    E_M_logrho = np.log(meanrho) + sigma**2/2. / (1+T)**2
 
     return {'<rho>_V': E_rho,  # 1
             '<ln rho>_V': E_logrho, #-(sigma**2)/2. * (1/(1+T)),
@@ -228,9 +230,9 @@ def moments_theoretical_hopkins(rho,sigma,T,meanrho=1):
             'S_rho,V': E_rhosq-E_rho**2, # np.exp(sigma**2/(1+3*T+2*T**2)) - 1,
             # E[logrhosq] - E[logrho]^2
             'S_logrho,V': E_logrhosq - E_logrho**2, # sigma**2,
-            '<rho>_M': E_rhosq,  #np.exp(sigma**2/(1+3*T+2*T**2)),
-            '<ln rho>_M': sigma**2/2. * (1+T)**-2,
-            'S_rho,M': np.exp(3*sigma**2/(1+4*T+3*T**2)) - np.exp(2*sigma**2/(1+3*T+2*T**2)),
+            '<rho>_M': E_M_rho,  #np.exp(sigma**2/(1+3*T+2*T**2)),
+            '<ln rho>_M': E_M_logrho,
+            'S_rho,M': meanrho**2 *(np.exp(3*sigma**2/(1+4*T+3*T**2)) - np.exp(2*sigma**2/(1+3*T+2*T**2))),
             'S_logrho,M': sigma**2 * (1+T)**-3,
             }
 

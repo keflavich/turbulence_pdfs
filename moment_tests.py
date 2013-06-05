@@ -33,27 +33,35 @@ pretty_labels = {'<rho>_V': r'$<\rho>_V = \rho_0$',
             'S_logrho,M': r'$S_{\ln \rho,M}$',
             }
 
+# subplot parameter (leave room for legend)
+right = 0.90
+
 for fignum in (0,1,2):
     pl.figure(fignum,figsize=(20,10))
     pl.clf()
     pl.suptitle("$\\rho_0=%0.1f$" % meanrhos[fignum])
-    pl.subplots_adjust(left=0.05,right=0.97,wspace=0.33)
+    pl.subplots_adjust(left=0.05,right=right,wspace=0.33)
     for ii,k in enumerate(keys):
         pl.subplot(2,4,ii+1)
         for jj,s in enumerate(sigmas):
             if ('ln' in k or 'log' in k):
-                L = pl.plot(Tvals, grid[k][fignum,jj,:], marker='x', label='$\\sigma=%0.1f' % s, alpha=0.5)
+                L = pl.plot(Tvals, grid[k][fignum,jj,:], marker='x', label='$\\sigma=%0.1f$' % s, alpha=0.5)
                 color = L[0].get_color()
-                pl.plot(Tvals, real_grid[k][fignum,jj,:], marker='+', linestyle='--', label='$\\sigma=%0.1f' % s, alpha=0.5, color=color)
+                pl.plot(Tvals, real_grid[k][fignum,jj,:], marker='+', linestyle='--', alpha=0.5, color=color)
             else:
-                L = pl.semilogy(Tvals, grid[k][fignum,jj,:], marker='x', label='$\\sigma=%0.1f' % s, alpha=0.5)
+                L = pl.semilogy(Tvals, grid[k][fignum,jj,:], marker='x', label='$\\sigma=%0.1f$' % s, alpha=0.5)
                 color = L[0].get_color()
-                pl.semilogy(Tvals, real_grid[k][fignum,jj,:], marker='+', linestyle='--', label='$\\sigma=%0.1f' % s, alpha=0.5, color=color)
+                pl.semilogy(Tvals, real_grid[k][fignum,jj,:], marker='+', linestyle='--', alpha=0.5, color=color)
         #pl.imshow(grid[k][:,:,0])
         #pl.colorbar()
         pl.xlabel("$T$",fontsize=18)
         pl.ylabel(pretty_labels[k],fontsize=18)
     pl.suptitle("$\\rho_0=%0.1f$" % meanrhos[fignum])
+    ax = pl.gca()
+    labels,lines = zip(*[(l.get_label(),l) for l in ax.lines if 'line' not in l.get_label()])
+    pl.figlegend(lines,labels,'right')
+
+    pl.savefig('figures/rho%0.1g_varyT_colorSigma.png' % meanrhos[fignum])
 
 
 # pl.figure(2)
@@ -68,22 +76,62 @@ for mm,signum in enumerate([1,3]):
     pl.figure(fignum+mm+1,figsize=(20,10))
     pl.clf()
     pl.suptitle(r'$\sigma=%0.1f$' % sigmas[signum])
-    pl.subplots_adjust(left=0.05,right=0.97,wspace=0.33)
+    pl.subplots_adjust(left=0.05,right=right,wspace=0.33)
     for ii,k in enumerate(keys):  #['<rho>_V','<rho>_M','<ln rho>_V','<ln rho>_M']):
         for jj,T in enumerate(Tvals):
             pl.subplot(2,4,ii+1)
             if 'ln' in k or 'log' in k:
-                pl.semilogx(meanrhos, grid[k][:,signum,jj],      marker='x', linewidth=2, alpha=0.5)
-                pl.semilogx(meanrhos, real_grid[k][:,signum,jj], marker='+', linewidth=2, alpha=0.5, linestyle='--')
+                L = pl.semilogx(meanrhos, grid[k][:,signum,jj],      marker='x', linewidth=2, alpha=0.5, label=r'$T=%0.1g$' % T)
+                color = L[0].get_color()
+                pl.semilogx(meanrhos, real_grid[k][:,signum,jj], marker='+', linewidth=2, alpha=0.5, linestyle='--', color=color)
             else:
-                pl.loglog(meanrhos, (grid[k][:,signum,jj]),      linewidth=2, alpha=0.5, marker='x', linestyle='-')
-                pl.loglog(meanrhos, (real_grid[k][:,signum,jj]), linewidth=2, alpha=0.5, marker='+', linestyle='--')
+                L = pl.loglog(meanrhos, (grid[k][:,signum,jj]),      linewidth=2, alpha=0.5, marker='x', linestyle='-', label=r'$T=%0.1g$' % T)
+                color = L[0].get_color()
+                pl.loglog(meanrhos, (real_grid[k][:,signum,jj]), linewidth=2, alpha=0.5, marker='+', linestyle='--', color=color)
             if 'S' not in k and 'ln' not in k:
                 pl.plot(pl.gca().get_xlim(),pl.gca().get_xlim(),'k:',alpha=0.5)
         pl.ylabel(pretty_labels[k], fontsize=18)
         pl.xlabel("$\\rho_0$", fontsize=18)
 
-    pl.show()
+    ax = pl.gca()
+    labels,lines = zip(*[(l.get_label(),l) for l in ax.lines if 'line' not in l.get_label()])
+    pl.figlegend(lines,labels,'right')
+
+    pl.savefig('figures/sigma%0.1f_varyrho_colorT.png' % sigmas[signum])
+
+
+for nn,Tnum in enumerate([0,1,4]):
+    pl.figure(fignum+mm+nn+1,figsize=(20,10))
+    pl.clf()
+    pl.suptitle(r'$T=%0.1g$' % Tvals[Tnum])
+    pl.subplots_adjust(left=0.05,right=right,wspace=0.33)
+    for ii,k in enumerate(keys):  #['<rho>_V','<rho>_M','<ln rho>_V','<ln rho>_M']):
+        for jj,rho in enumerate(meanrhos):
+            pl.subplot(2,4,ii+1)
+            if 'ln' in k or 'log' in k:
+                L = pl.semilogx(sigmas, grid[k][jj,:,Tnum],      marker='x', linewidth=2, alpha=0.5, label=r'$\rho=%0.1g$' % rho)
+                color = L[0].get_color()
+                pl.semilogx(sigmas, real_grid[k][jj,:,Tnum], marker='+', linewidth=2, alpha=0.5, linestyle='--', color=color)
+            else:
+                L = pl.loglog(sigmas, (grid[k][jj,:,Tnum]),      linewidth=2, alpha=0.5, marker='x', linestyle='-', label=r'$\rho=%0.1g$' % rho)
+                color = L[0].get_color()
+                pl.loglog(sigmas, (real_grid[k][jj,:,Tnum]), linewidth=2, alpha=0.5, marker='+', linestyle='--', color=color)
+            if k in ('S_logrho,V','S_logrho,M'):
+                xvals = np.linspace(*pl.gca().get_ylim())
+                pl.plot(xvals,xvals**2,'k:',alpha=0.5)
+        pl.ylabel(pretty_labels[k], fontsize=18)
+        pl.xlabel("$\\sigma_V$", fontsize=18)
+    
+    ax = pl.gca()
+    labels,lines = zip(*[(l.get_label(),l) for l in ax.lines if 'line' not in l.get_label()])
+    pl.figlegend(lines,labels,'right')
+
+
+    pl.savefig('figures/tval%0.1g_varysigma_colorRho.png' % Tvals[Tnum])
+
+
+
+pl.show()
 
 
 
