@@ -1,4 +1,5 @@
 from scipy.special import iv
+import scipy.optimize
 import numpy as np
 
 
@@ -98,6 +99,64 @@ def hopkins(rho, sigma, T, meanrho=1.0, normalize=True):
     else:
         return P_V
 
+def sigma_of_T(T, logform=False):
+    """
+    Use the relationship between sigma and T from Hopkins 2013 fig 3
+
+    Parameters
+    ----------
+    T : float
+        The T parameter of the distribution
+    logform : bool
+        If false, use
+        T ~ 0.1 sigma_logM^2
+        if True, use:
+        T ~ 0.25 log(1+0.25 sigma_logM^4)
+
+    Returns
+    -------
+    Sigma_logV, the input parameter for the distribution
+    (sigma_logV^2 = (1+T)^3 sigma_logM^2
+    """
+    if logform:
+        return ((np.exp(T*4)-1) * 4 )**0.25 * (1+T)**1.5
+    else:
+        return (10*T)**0.5 * (1+T)**1.5
+
+def T_of_sigma(sigma, logform=False, maxT=8):
+    """
+    Inverse of sigma_of_T, again using the relation from Hopkins fig 3
+
+    Uses scipy root finding because there are no analytic solutions for T of
+    sigma_V
+
+    Parameters
+    ----------
+    sigma : float
+        sigma_logV, the defining width of the lognormal
+    logform : bool
+        If false, use
+        T ~ 0.1 sigma_logM^2 = 0.1 sigma_logV^2 (1+T)**-3
+        if True, use:
+        T ~ 0.25 log(1+0.25 sigma_logM^4)
+    maxT : float
+        A parameter passed to the root finding algorithm.  For the linear
+        equation, can't be more than about 10 or the root finder breaks.
+        Hopkins only fit these equations for T<1 anyway.
+
+    Returns
+    -------
+    T
+    """
+    if logform:
+        def eq(T):
+            return T - 0.25 * np.log(1+0.25*sigma**4 * (1+T)**-6)
+    else:
+        def eq(T):
+            return T - 0.1 * sigma**2 * (1+T)**-3
+    #print 'DEBUG: f(a),f(b):',eq(0),eq(maxT)
+    return scipy.optimize.brentq(eq,0,maxT)
+
 def hopkins_masspdf(rho, sigma_M, T):
     """
     Mass-weighted version of the Hopkins PDF
@@ -176,7 +235,7 @@ def moments(rho, sigma, T, meanrho=1):
             'S_logrho,M': E_M_logrhosq - E_M_logrho**2, #(logrho**2 * mass_distribution*dlogrho).sum() - logmassexpectation**2, 
             }
 
-def moments_theoretical_lognormal(rho,sigma,T,meanrho=1):
+def moments_theoretical_lognormal(sigma,T,meanrho=1):
     return {'<rho>_V': meanrho,
             '<ln rho>_V': -sigma**2/2.,
             'S_rho,V': np.exp(sigma**2) - 1,
@@ -187,7 +246,7 @@ def moments_theoretical_lognormal(rho,sigma,T,meanrho=1):
             'S_logrho,M': sigma**2,
             }
 
-def moments_theoretical_hopkins(rho,sigma,T,meanrho=1):
+def moments_theoretical_hopkins(sigma,T,meanrho=1):
     E_rho = meanrho
     # have to simplify out lambda, since it can be zero
     # lam = sigma**2/(2*T**2)

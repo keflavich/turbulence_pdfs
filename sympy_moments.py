@@ -44,3 +44,6 @@ if __name__ == "__main__":
     print "E[log(rho)^2] = ",expectation(logrho**2,x)
     print "E[rho log(rho)] = ",expectation(rho(x)*logrho,x)
     print "E[rho log(rho)^2] = ",expectation(rho(x)*logrho**2,x)
+
+    T,s = sm.var('T,s',real=True,positive=True)
+    sm.solve(T - 0.1 * s**2 * (1+T)**-3, T)
