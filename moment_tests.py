@@ -12,7 +12,7 @@ meanrhos = np.logspace(0,5,6)
 keys = hopkins_pdf.moments_theoretical_hopkins(1, 1, meanrho=1).keys()
 
 theoretical_moments = {r:{T:{s:hopkins_pdf.moments_theoretical_hopkins(s, T, meanrho=r) for s in sigmas} for T in Tvals} for r in meanrhos}
-lognormal_theoretical_moments = {r:{T:{s:hopkins_pdf.moments_theoretical_lognormal(0, s, T, meanrho=r) for s in sigmas} for T in Tvals} for r in meanrhos}
+lognormal_theoretical_moments = {r:{T:{s:hopkins_pdf.moments_theoretical_lognormal(s, T, meanrho=r) for s in sigmas} for T in Tvals} for r in meanrhos}
 
 grid = {k:np.array([[[theoretical_moments[r][T][s][k] for T in Tvals] for s in sigmas] for r in meanrhos]) for k in keys}
 grid_lognormal = {k:np.array([[[lognormal_theoretical_moments[r][T][s][k] for T in Tvals] for s in sigmas] for r in meanrhos]) for k in keys}
@@ -114,7 +114,7 @@ for nn,Tnum in enumerate([0,1,4]):
                 L = pl.semilogx(sigmas, grid[k][jj,:,Tnum],      marker='x', linewidth=2, alpha=0.5, label=r'$\rho=%0.1g$' % rho)
                 color = L[0].get_color()
                 pl.semilogx(sigmas, real_grid[k][jj,:,Tnum], marker='+', linewidth=2, alpha=0.5, linestyle='--', color=color)
-                pl.semilogx(sigmas, lognormal_grid[k][jj,:,Tnum],      marker='x', linewidth=2, alpha=0.5, color='r', linestyle=':')
+                pl.semilogx(sigmas, grid_lognormal[k][jj,:,Tnum],      marker='x', linewidth=2, alpha=0.5, color='r', linestyle=':')
             else:
                 L = pl.loglog(sigmas, (grid[k][jj,:,Tnum]),      linewidth=2, alpha=0.5, marker='x', linestyle='-', label=r'$\rho=%0.1g$' % rho)
                 color = L[0].get_color()
@@ -143,11 +143,14 @@ if True:
     # sigma_M^2 = 10 T 
     # sigma_V^2 = (1+T)^3 *10 * T
     TSigmaGrid = {k:np.empty(len(Tvals)) for k in keys}
+    TSigmaGridLognormal = {k:np.empty(len(Tvals)) for k in keys}
     for ii,T in enumerate(Tvals):
         sigma = (10*T*(1+T)**3)**0.5
         moments = hopkins_pdf.moments_theoretical_hopkins(sigma, T, meanrho=1)
+        moments_lognormal = hopkins_pdf.moments_theoretical_lognormal(sigma, T, meanrho=1)
         for k in keys:
             TSigmaGrid[k][ii] = moments[k]
+            TSigmaGridLognormal[k][ii] = moments_lognormal[k]
 
 
     # numerical determination...
@@ -163,15 +166,19 @@ if True:
         if ii >= 5:
             if 'ln' in k or 'log' in k:
                 L = pl.plot(Tvals, TSigmaGrid[k],      linewidth=2, alpha=0.5)
+                L = pl.plot(Tvals, TSigmaGridLognormal[k],      linewidth=2, alpha=0.5, color='r')
             else:
                 L = pl.semilogy(Tvals, TSigmaGrid[k],      linewidth=2, alpha=0.5, linestyle='-')
+                L = pl.semilogy(Tvals, TSigmaGridLognormal[k],      linewidth=2, alpha=0.5, linestyle='-', color='r')
             pl.xlabel("$T = 0.1 \sigma_{s,M}^2$", fontsize=18)
             pl.plot(0.48, sig4moments[k], marker='s', color='k')
         else:
             if 'ln' in k or 'log' in k:
                 L = pl.plot(sigmas, TSigmaGrid[k],      linewidth=2, alpha=0.5)
+                L = pl.plot(sigmas, TSigmaGridLognormal[k],      linewidth=2, alpha=0.5,color='r')
             else:
                 L = pl.semilogy(sigmas, TSigmaGrid[k],      linewidth=2, alpha=0.5, linestyle='-')
+                L = pl.semilogy(sigmas, TSigmaGridLognormal[k],      linewidth=2, alpha=0.5, linestyle='-',color='r')
             pl.plot(4, sig4moments[k], marker='s', color='k')
             pl.xlabel("$\sigma_{s,V}$", fontsize=18)
         pl.ylabel(pretty_labels[k], fontsize=18)
