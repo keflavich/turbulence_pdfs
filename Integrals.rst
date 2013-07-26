@@ -6,7 +6,11 @@ Hopkins PDF Generalization
 
 `Hopkins 2013`_ presents a non-lognormal form of the probability distribution
 function of density in turbulence, depending primarily on a parameter
-:math:`T`.  I examine some of its properties here.
+:math:`T`.  I examine some of its properties here.  All of the equations shown
+on this page are implemented in https://github.com/keflavich/turbulence_pdfs,
+in particular the functions ``moments_theoretical_hopkins`` and ``moments`` in
+`hopkins_pdf.py
+<https://github.com/keflavich/turbulence_pdfs/blob/master/hopkins_pdf.py>`__.
 
 The conservation equations, conservation of probability and mass
 
@@ -14,11 +18,12 @@ The conservation equations, conservation of probability and mass
 
 .. math:: \int_{-\infty}^\infty\rho P_V(\ln \rho) d \ln \rho \equiv \rho_0 = 1
 
-The :math:`=1` is the definition used by `Hopkins 2013`_.  Part of the goal of this document
-is to generalize to :math:`\rho_0 <> 1`
+:math:`\rho_0=1` is the definition used by `Hopkins 2013`_.  Part of the goal
+of this document is to generalize to :math:`\rho_0 <> 1`
 
-The most important thing to do is determine the values of the moments of the distribution, including
-the integral corrections for the Dirac Delta function component of the PDF.
+The most important thing to do is determine the values of the moments of the
+distribution, including the integral corrections for the Dirac Delta function
+component of the PDF.
 
 The PDF
 -------
@@ -388,6 +393,45 @@ As expected, we recover the correct relation from `Hopkins 2013`_:
 *independent* of :math:`\rho_0`.
 
 
+Properties of the Hopkins PDF
+=============================
+I began this investigation in order to find out whether a different parameter,
+i.e. something related to the compressiveness of the turbulent driving, could
+be responsible for the "discrepancy" between the Formaldehyde-derived density
+and the volume-averaged density of some clouds.
 
+I naively expected that, in compressive turbulence, more of the mass will be
+concentrated at higher density, which should drive up the mass-weighted mean
+density.  
+
+`Hopkins 2013`_ showed that :math:`T\sim\mathcal{M}_C`.  If this is taken on
+face value, without recognizing the relation between :math:`T` and
+:math:`\sigma`, it means that for *fixed* :math:`\sigma`,
+:math:`<\rho>_M\propto e^{-T^2}`. 
+
+This figure shows the relation of the various moments and :math:`T`.  The plots
+show both the "theoretical" result (i.e., doing the integral by hand) and the
+numerical result with 50,000 data points plus a correction for the
+:math:`\delta` terms; the agreement is essentially perfect excepting some
+numerical noise (the only visible discrepancy is for a perfect lognormal at
+high :math:`\sigma_V`):
+
+.. image:: |filename|/images/rho1_varyT_colorSigma.png
+    :width: 800
+
+However, `Hopkins 2013`_ also found that simulations generally produced
+:math:`T\sim0.1\sigma_{s,M}^2` (though a relation of the form :math:`T\sim 0.25
+\ln(1+0.25\sigma_{s,M}^4)` is also a good fit).
+
+If you use the simpler of these relations, the expected relationship (mean mass
+increasing with increasing "compressiveness") is recovered.  However, it comes
+with an increasing :math:`\sigma_s`.  In these plots, half are labeled with
+:math:`\sigma` and the others are labeled with :math:`T`, though the two are
+equivalent.  The highest :math:`\sigma_s` observed in any of the simulations
+shown in `Hopkins 2013`_ was about :math:`\sigma_s=4` (marked with a black
+square below), so the maximum :math:`\rho_M/\rho_V \sim 10^2`.
+
+.. image:: |filename|/images/TSigma.png
+    :width: 800
 
 .. _Hopkins 2013: http://adsabs.harvard.edu/abs/2013MNRAS.430.1880H

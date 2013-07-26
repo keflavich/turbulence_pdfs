@@ -9,9 +9,9 @@ Tvals = np.linspace(0,1.5,7)
 sigmas = np.array([0.25,0.5,1.0,2.0,4.0])
 meanrhos = np.logspace(0,5,6)
 
-keys = hopkins_pdf.moments_theoretical_hopkins(0, 1, 1, meanrho=1).keys()
+keys = hopkins_pdf.moments_theoretical_hopkins(1, 1, meanrho=1).keys()
 
-theoretical_moments = {r:{T:{s:hopkins_pdf.moments_theoretical_hopkins(0, s, T, meanrho=r) for s in sigmas} for T in Tvals} for r in meanrhos}
+theoretical_moments = {r:{T:{s:hopkins_pdf.moments_theoretical_hopkins(s, T, meanrho=r) for s in sigmas} for T in Tvals} for r in meanrhos}
 lognormal_theoretical_moments = {r:{T:{s:hopkins_pdf.moments_theoretical_lognormal(0, s, T, meanrho=r) for s in sigmas} for T in Tvals} for r in meanrhos}
 
 grid = {k:np.array([[[theoretical_moments[r][T][s][k] for T in Tvals] for s in sigmas] for r in meanrhos]) for k in keys}
@@ -134,6 +134,49 @@ for nn,Tnum in enumerate([0,1,4]):
 
 
     pl.savefig('figures/tval%0.1g_varysigma_colorRho.png' % Tvals[Tnum])
+
+if True:
+
+    Tvals = np.linspace(0,1.2,200)
+
+    # sigma_V^2 = (1+T)^3 sigma_M^2 
+    # sigma_M^2 = 10 T 
+    # sigma_V^2 = (1+T)^3 *10 * T
+    TSigmaGrid = {k:np.empty(len(Tvals)) for k in keys}
+    for ii,T in enumerate(Tvals):
+        sigma = (10*T*(1+T)**3)**0.5
+        moments = hopkins_pdf.moments_theoretical_hopkins(sigma, T, meanrho=1)
+        for k in keys:
+            TSigmaGrid[k][ii] = moments[k]
+
+
+    # numerical determination...
+    sig4moments = hopkins_pdf.moments_theoretical_hopkins(4, 0.48, meanrho=1)
+
+    sigmas = (10*Tvals*(1+Tvals)**3)**0.5
+    pl.figure(fignum+mm+nn+1,figsize=(20,10))
+    pl.clf()
+    pl.suptitle(r'$T=0.1\sigma_{s,M}^2 = 0.1 \sigma_{s,V}^2 (1+T)^{-3}$')
+    pl.subplots_adjust(left=0.05,right=right,wspace=0.33)
+    for ii,k in enumerate(keys):  
+        pl.subplot(2,4,ii+1)
+        if ii >= 5:
+            if 'ln' in k or 'log' in k:
+                L = pl.plot(Tvals, TSigmaGrid[k],      linewidth=2, alpha=0.5)
+            else:
+                L = pl.semilogy(Tvals, TSigmaGrid[k],      linewidth=2, alpha=0.5, linestyle='-')
+            pl.xlabel("$T = 0.1 \sigma_{s,M}^2$", fontsize=18)
+            pl.plot(0.48, sig4moments[k], marker='s', color='k')
+        else:
+            if 'ln' in k or 'log' in k:
+                L = pl.plot(sigmas, TSigmaGrid[k],      linewidth=2, alpha=0.5)
+            else:
+                L = pl.semilogy(sigmas, TSigmaGrid[k],      linewidth=2, alpha=0.5, linestyle='-')
+            pl.plot(4, sig4moments[k], marker='s', color='k')
+            pl.xlabel("$\sigma_{s,V}$", fontsize=18)
+        pl.ylabel(pretty_labels[k], fontsize=18)
+
+    pl.savefig('figures/TSigma.png')
 
 
 
