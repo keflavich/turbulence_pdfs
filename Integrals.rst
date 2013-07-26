@@ -39,6 +39,18 @@ The ratio :math:`\rho/\rho_0` is needed to ensure self-consistency: the mass
 PDF must also conserve probability, which means it must be scaled by
 :math:`1/\rho_0`.
 
+These distributions are slightly different than those shown in `Hopkins 2013`_.
+The :math:`m=0` term in the summation version of the PDF yields a Dirac
+:math:`\delta` function in the integral form of the PDF.  To quote Phil::
+
+    If you check, the summation expression is exact, and does exactly integrate
+    to unity (and properly conserve mass) for any value of T or lambda (with
+    u>0). But this is with the implicit understanding that the gamma-function
+    distribution with exponent "m" should be taken to go to a delta-function
+    about u=0 when m=0 (since otherwise it is ill defined; and physically this
+    is the "no event/multiplication" case, so that's the only allowed case for
+    the term in u). 
+
 .. But note that both of these distributions can depend on :math:`\rho_0`, changing :math:`u` to be
 .. 
 .. .. math:: u\equiv \frac{\lambda}{1+T} - \frac{\ln (\rho/\rho_0)}{T}  ;  (u \geq 0)

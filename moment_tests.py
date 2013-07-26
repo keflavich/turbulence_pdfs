@@ -12,8 +12,10 @@ meanrhos = np.logspace(0,5,6)
 keys = hopkins_pdf.moments_theoretical_hopkins(0, 1, 1, meanrho=1).keys()
 
 theoretical_moments = {r:{T:{s:hopkins_pdf.moments_theoretical_hopkins(0, s, T, meanrho=r) for s in sigmas} for T in Tvals} for r in meanrhos}
+lognormal_theoretical_moments = {r:{T:{s:hopkins_pdf.moments_theoretical_lognormal(0, s, T, meanrho=r) for s in sigmas} for T in Tvals} for r in meanrhos}
 
 grid = {k:np.array([[[theoretical_moments[r][T][s][k] for T in Tvals] for s in sigmas] for r in meanrhos]) for k in keys}
+grid_lognormal = {k:np.array([[[lognormal_theoretical_moments[r][T][s][k] for T in Tvals] for s in sigmas] for r in meanrhos]) for k in keys}
 # grid.shape = [r,s,T]
 
 rho = np.logspace(-35,35,50000,base=np.e)
@@ -112,9 +114,11 @@ for nn,Tnum in enumerate([0,1,4]):
                 L = pl.semilogx(sigmas, grid[k][jj,:,Tnum],      marker='x', linewidth=2, alpha=0.5, label=r'$\rho=%0.1g$' % rho)
                 color = L[0].get_color()
                 pl.semilogx(sigmas, real_grid[k][jj,:,Tnum], marker='+', linewidth=2, alpha=0.5, linestyle='--', color=color)
+                pl.semilogx(sigmas, lognormal_grid[k][jj,:,Tnum],      marker='x', linewidth=2, alpha=0.5, color='r', linestyle=':')
             else:
                 L = pl.loglog(sigmas, (grid[k][jj,:,Tnum]),      linewidth=2, alpha=0.5, marker='x', linestyle='-', label=r'$\rho=%0.1g$' % rho)
                 color = L[0].get_color()
+                pl.loglog(sigmas, (grid_lognormal[k][jj,:,Tnum]),      linewidth=2, alpha=0.5, marker='x', linestyle=':',color='r')
                 pl.loglog(sigmas, (real_grid[k][jj,:,Tnum]), linewidth=2, alpha=0.5, marker='+', linestyle='--', color=color)
             if k in ('S_logrho,V','S_logrho,M'):
                 ylim = pl.gca().get_ylim()
