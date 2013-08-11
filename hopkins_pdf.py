@@ -99,7 +99,7 @@ def hopkins(rho, sigma, T, meanrho=1.0, normalize=True):
     else:
         return P_V
 
-def sigma_of_T(T, logform=False):
+def sigma_of_T(T, logform=False, log_const1=0.25, log_const2=0.25, const1=0.10):
     """
     Use the relationship between sigma and T from Hopkins 2013 fig 3
 
@@ -112,6 +112,7 @@ def sigma_of_T(T, logform=False):
         T ~ 0.1 sigma_logM^2
         if True, use:
         T ~ 0.25 log(1+0.25 sigma_logM^4)
+        (actually, T ~ log_const1 log(1 + log_const2 * sigma_logM^4)
 
     Returns
     -------
@@ -119,11 +120,12 @@ def sigma_of_T(T, logform=False):
     (sigma_logV^2 = (1+T)^3 sigma_logM^2
     """
     if logform:
-        return ((np.exp(T*4)-1) * 4 )**0.25 * (1+T)**1.5
+        return ((np.exp(T/log_const1)-1) / log_const2)**0.25 * (1+T)**1.5
     else:
-        return (10*T)**0.5 * (1+T)**1.5
+        return ((1./const1)*T)**0.5 * (1+T)**1.5
 
-def T_of_sigma(sigma, logform=False, maxT=8):
+def T_of_sigma(sigma, logform=False, maxT=8, log_const1=0.25, log_const2=0.25,
+               const1=0.10):
     """
     Inverse of sigma_of_T, again using the relation from Hopkins fig 3
 
@@ -150,10 +152,10 @@ def T_of_sigma(sigma, logform=False, maxT=8):
     """
     if logform:
         def eq(T):
-            return T - 0.25 * np.log(1+0.25*sigma**4 * (1+T)**-6)
+            return T - log_const1 * np.log(1+log_const2*sigma**4 * (1+T)**-6)
     else:
         def eq(T):
-            return T - 0.1 * sigma**2 * (1+T)**-3
+            return T - const1 * sigma**2 * (1+T)**-3
     #print 'DEBUG: f(a),f(b):',eq(0),eq(maxT)
     return scipy.optimize.brentq(eq,0,maxT)
 
@@ -236,6 +238,8 @@ def moments(rho, sigma, T, meanrho=1):
             }
 
 def moments_theoretical_lognormal(sigma,T,meanrho=1):
+    if meanrho != 1:
+        raise NotImplementedError("Have not yet computed theoretical lognormal distribution moments for rho!=1")
     return {'<rho>_V': meanrho,
             '<ln rho>_V': -sigma**2/2.,
             'S_rho,V': np.exp(sigma**2) - 1,
