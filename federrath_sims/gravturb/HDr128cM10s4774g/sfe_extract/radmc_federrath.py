@@ -88,14 +88,14 @@ with open('radmc3d.inp','w') as f:
     params['lines_mode'] = 50
     f.write(params_string.format(**params))
 
-os.system('radmc3d calcpop writepop')
+assert os.system('radmc3d calcpop writepop') == 0
 
 with open('radmc3d.inp','w') as f:
     params['lines_mode'] = 3
     f.write(params_string.format(**params))
 
 # compute the dust temperature
-os.system('radmc3d mctherm')
+assert os.system('radmc3d mctherm') == 0
 
 # iline: 1 = CO 1-0, 2 = CO 2-1, etc.
 # widthkms = full width of output spectrum, divided by linenlam
