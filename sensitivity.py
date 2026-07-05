@@ -34,6 +34,30 @@ this module works entirely in ``ln`` internally and exposes explicit
 converters (`ln_from_log10`, `log10_from_ln`, `sigma_ln_from_log10`, ...) for
 interfacing with the ``log10`` arrays used elsewhere.
 
+Two sensitivity questions
+-------------------------
+1. *Theory-parameter freedom* -- how far ``eps_ff`` moves when the free
+   parameters (chiefly the driving parameter ``b``) are varied over their
+   plausible ranges.  See `elasticity_sigma`, `elasticity_b`, `jacobian`,
+   `envelope_epsff`.
+2. *Observational error propagation* -- how measurement uncertainties in the
+   physical observables (mean density, cloud size, velocity dispersion,
+   temperature) propagate to ``eps_ff``.  See `observable_jacobian`,
+   `uncertainty_budget`, `montecarlo_epsff`.
+
+The second analysis exposes a structural asymmetry that mirrors the first:
+the **mean density** (set by mass/volume) enters ``eps_ff`` *only* through the
+collapse threshold ``s_crit`` -- with no compensating term -- so even a small
+mass/volume uncertainty propagates undamped, just as ``b`` does through the PDF
+width.  The **velocity dispersion**, by contrast, enters *both* the width
+``sigma_s`` (broadening the PDF) *and* the threshold (through
+``alpha_vir M^2 ∝ sigma_v^4``); these partially cancel, so ``eps_ff`` is far
+*less* sensitive to ``sigma_v`` -- the same cancellation mechanism that makes
+``M`` less leveraged than ``b``.  Consequently the mean density (mass/volume),
+which is also the *most poorly constrained* observable, dominates the predicted
+``eps_ff`` uncertainty budget, while the well-measured velocity dispersion
+contributes negligibly.
+
 Caveats (see also the paper text these support)
 -----------------------------------------------
 - ``mu = -sigma_s**2 / 2`` is closed-box mass-conservation bookkeeping; the PDF
@@ -629,3 +653,230 @@ def envelope_epsff(mach_grid, b_range=(1.0 / 3, 1.0), alpha_vir=1.0,
                         multiff=multiff, eps_core=eps_core, phi_t=phi_t,
                         warn=False, **scrit_kwargs)
     return grid.min(axis=0), grid.max(axis=0)
+
+
+# ---------------------------------------------------------------------------
+# Observational error propagation
+# ---------------------------------------------------------------------------
+# How the *dimensionless theory inputs* (alpha_vir, mach, b) depend on the
+# *physical observables*, as power laws: entries are exponents
+# ``d ln(theory input) / d ln(observable)``.  These follow from the standard
+# definitions and hold for every s_crit model (the model only changes how
+# eps_ff depends on alpha_vir/mach, which is handled separately):
+#
+#   Mach number      M       = sigma_v / c_s
+#   virial parameter alpha_vir = 5 sigma_v^2 R / (G M_cloud)
+#
+# Two self-consistent observable bases:
+#
+# 'density'  -- independent observables {mean_density rho_0, radius R,
+#               sigma_v, c_s, b}; the cloud mass M_cloud = rho_0 * (4/3) pi R^3
+#               is *derived*.  Then
+#                   alpha_vir = (15 / 4 pi) sigma_v^2 / (G rho_0 R^2)
+#               so   ln alpha_vir = 2 ln sigma_v - ln rho_0 - 2 ln R + const.
+#               rho_0 enters ONLY the threshold (via alpha_vir), with no
+#               compensating term -- the "pure threshold" observable, the
+#               mean-density analog of b (the "pure width" parameter).
+#
+# 'mass_volume' -- independent observables {mass M_cloud, volume V, sigma_v,
+#               c_s, b}; here R = (3V/4pi)^{1/3}, so
+#                   alpha_vir = 5 sigma_v^2 R / (G M_cloud) ∝ sigma_v^2 V^{1/3} / M
+#               and the mean density rho_0 = M/V is derived.  Note volume enters
+#               only weakly (exponent 1/3): the rho_0 (V^-1) and R^2 (V^{2/3})
+#               dependences of alpha_vir partially cancel -- so a mean-density
+#               error propagates very differently depending on whether it comes
+#               from the mass or the volume.
+OBSERVABLE_EXPONENTS = {
+    'density': {
+        'mean_density': {'alpha_vir': -1.0},
+        'radius':       {'alpha_vir': -2.0},
+        'sigma_v':      {'alpha_vir': 2.0, 'mach': 1.0},
+        'c_s':          {'mach': -1.0},
+        'b':            {'b': 1.0},
+    },
+    'mass_volume': {
+        'mass':    {'alpha_vir': -1.0},
+        'volume':  {'alpha_vir': 1.0 / 3.0},
+        'sigma_v': {'alpha_vir': 2.0, 'mach': 1.0},
+        'c_s':     {'mach': -1.0},
+        'b':       {'b': 1.0},
+    },
+}
+
+# Fiducial fractional (natural-log) uncertainties on the observables, chosen to
+# reflect the *observational reality*, not just the theory:
+#   - mean density (mass/volume): poorly constrained -- distance^2 for masses,
+#     assumed geometry for volumes, chemical abundances for tracers.  Factor
+#     ~1.6 (sigma_ln ~ 0.5) is generous.
+#   - cloud radius: boundary definition + distance; factor ~1.35.
+#   - velocity dispersion: measured directly from line widths; ~10%.
+#   - sound speed: from temperature (c_s ∝ sqrt(T)); ~10%.
+#   - b (driving parameter): a *theory* freedom spanning 1/3 -> 1 (factor 3),
+#     sigma_ln ~ 0.45; kept separate from the observational budget.
+DEFAULT_LN_SIGMA = {
+    'mean_density': 0.5, 'radius': 0.3, 'sigma_v': 0.1, 'c_s': 0.1,
+    'mass': 0.5, 'volume': 0.5, 'b': 0.45,
+}
+
+
+def theory_inputs_from_observables(factors, fiducial, basis='density'):
+    r"""
+    Map multiplicative perturbations of the observables to the dimensionless
+    theory inputs ``(b, mach, alpha_vir)``.
+
+    Parameters
+    ----------
+    factors : dict
+        ``{observable: multiplicative factor}`` relative to the fiducial
+        (missing observables default to 1, i.e. no perturbation).
+    fiducial : dict
+        Fiducial dimensionless inputs; must contain ``b``, ``mach``,
+        ``alpha_vir``.
+    basis : {'density', 'mass_volume'}
+
+    Returns
+    -------
+    (b, mach, alpha_vir) : tuple of float
+    """
+    exps = OBSERVABLE_EXPONENTS[basis]
+    ln = {'b': 0.0, 'mach': 0.0, 'alpha_vir': 0.0}
+    for obs, factor in factors.items():
+        if obs not in exps:
+            raise KeyError("unknown observable {!r} for basis {!r}"
+                           .format(obs, basis))
+        for tin, e in exps[obs].items():
+            ln[tin] += e * np.log(factor)
+    return (fiducial['b'] * np.exp(ln['b']),
+            fiducial['mach'] * np.exp(ln['mach']),
+            fiducial['alpha_vir'] * np.exp(ln['alpha_vir']))
+
+
+def epsff_from_observables(factors, fiducial, model='km05', multiff=True,
+                           basis='density', eps_core=0.5, phi_t=1.0,
+                           **scrit_kwargs):
+    """
+    ``eps_ff`` as a function of multiplicative perturbations to the observables.
+
+    Thin wrapper: maps ``factors`` through `theory_inputs_from_observables` and
+    evaluates `epsff`.  See `observable_jacobian` for the log-log sensitivities.
+    """
+    b, mach, alpha_vir = theory_inputs_from_observables(factors, fiducial,
+                                                        basis=basis)
+    return epsff(b, mach, alpha_vir, model=model, multiff=multiff,
+                 eps_core=eps_core, phi_t=phi_t, warn=False, **scrit_kwargs)
+
+
+def observable_jacobian(fiducial, model='km05', multiff=True, basis='density',
+                        rel_step=1e-6):
+    r"""
+    Log-log sensitivity of ``eps_ff`` to each **physical observable**:
+    ``d ln eps_ff / d ln X`` for ``X`` in the chosen ``basis``.
+
+    This is the observational counterpart of `jacobian` (which differentiates
+    w.r.t. the dimensionless theory inputs).  It reveals the physically crucial
+    structure:
+
+    - **mean density** (and, in the mass/volume basis, the **mass**) enters
+      ``eps_ff`` *only* through the threshold ``s_crit`` -- no compensating
+      term -- so its uncertainty propagates undamped.
+    - **velocity dispersion** enters *both* the PDF width ``sigma_s`` (broaden
+      -> more dense gas) *and* the threshold via ``alpha_vir M^2 ∝ sigma_v^4``
+      (raise -> less dense gas); these partially cancel, so ``eps_ff`` is far
+      *less* sensitive to ``sigma_v`` than one might expect.  (Same mechanism
+      as the b-vs-M cancellation in `jacobian`.)
+
+    Computed by central finite difference of `epsff_from_observables` (the
+    exponent map is the single source of truth).
+
+    Returns
+    -------
+    dict
+        ``{observable: d ln eps_ff / d ln observable}``.
+    """
+    out = {}
+    for obs in OBSERVABLE_EXPONENTS[basis]:
+        fhi = epsff_from_observables({obs: 1 + rel_step}, fiducial, model=model,
+                                     multiff=multiff, basis=basis)
+        flo = epsff_from_observables({obs: 1 - rel_step}, fiducial, model=model,
+                                     multiff=multiff, basis=basis)
+        out[obs] = (np.log(fhi) - np.log(flo)) / (2 * rel_step)
+    return out
+
+
+def uncertainty_budget(fiducial, ln_sigma=None, model='km05', multiff=True,
+                       basis='density'):
+    r"""
+    Linearized (first-order Gaussian) propagation of observational
+    uncertainties to ``eps_ff``.
+
+    For independent observables with fractional log-uncertainties
+    ``sigma_{ln X}``,
+
+    .. math::
+        \sigma_{\ln \epsilon_{\rm ff}}^2 =
+            \sum_X \left(\frac{d\ln\epsilon_{\rm ff}}{d\ln X}\right)^2
+                   \sigma_{\ln X}^2
+
+    Parameters
+    ----------
+    fiducial : dict
+        Fiducial ``b``, ``mach``, ``alpha_vir``.
+    ln_sigma : dict, optional
+        Per-observable fractional log-uncertainties; defaults to
+        `DEFAULT_LN_SIGMA`.
+    model, multiff, basis
+        As in `observable_jacobian`.
+
+    Returns
+    -------
+    dict
+        ``{'elasticity': {X: dlneps/dlnX}, 'contribution': {X: variance share},
+           'sigma_ln_epsff': float, 'factor': exp(sigma_ln_epsff)}``.
+        ``contribution[X]`` is the *variance* contributed by ``X``
+        (so the shares sum to ``sigma_ln_epsff**2``).
+    """
+    if ln_sigma is None:
+        ln_sigma = DEFAULT_LN_SIGMA
+    elas = observable_jacobian(fiducial, model=model, multiff=multiff,
+                               basis=basis)
+    contrib = {x: (elas[x] * ln_sigma.get(x, 0.0)) ** 2 for x in elas}
+    var = sum(contrib.values())
+    return {'elasticity': elas, 'contribution': contrib,
+            'sigma_ln_epsff': np.sqrt(var), 'factor': np.exp(np.sqrt(var))}
+
+
+def montecarlo_epsff(fiducial, ln_sigma=None, model='km05', multiff=True,
+                     basis='density', n=20000, seed=0, observables=None):
+    r"""
+    Monte-Carlo propagation of observational uncertainties to ``eps_ff``
+    (the nonlinear check on the linearized `uncertainty_budget`).
+
+    Draws each observable as a lognormal with the given fractional log-width,
+    evaluates ``eps_ff``, and returns the sample.
+
+    Parameters
+    ----------
+    observables : sequence of str, optional
+        Restrict the perturbed observables (e.g. ``['mean_density']`` to
+        isolate the density-only spread).  Default: all observables in
+        ``basis``.
+    seed : int
+        Seed for reproducibility.
+
+    Returns
+    -------
+    ndarray
+        ``eps_ff`` samples (length ``n``).
+    """
+    if ln_sigma is None:
+        ln_sigma = DEFAULT_LN_SIGMA
+    if observables is None:
+        observables = list(OBSERVABLE_EXPONENTS[basis])
+    rng = np.random.default_rng(seed)
+    out = np.empty(n)
+    for i in range(n):
+        factors = {x: np.exp(rng.normal(0.0, ln_sigma.get(x, 0.0)))
+                   for x in observables}
+        out[i] = epsff_from_observables(factors, fiducial, model=model,
+                                        multiff=multiff, basis=basis)
+    return out

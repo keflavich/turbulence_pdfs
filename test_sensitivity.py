@@ -224,6 +224,72 @@ def test_envelope_ordering_and_width():
 
 
 # ---------------------------------------------------------------------------
+# observational error propagation
+# ---------------------------------------------------------------------------
+OBS_FID = dict(b=0.4, mach=10.0, alpha_vir=1.0)
+
+
+def test_observable_jacobian_matches_direct_fd():
+    # the exponent-map composition must equal a direct FD of epsff_from_obs
+    jac = sv.observable_jacobian(OBS_FID, model='km05', multiff=True)
+    h = 1e-6
+    for obs in sv.OBSERVABLE_EXPONENTS['density']:
+        fp = sv.epsff_from_observables({obs: 1 + h}, OBS_FID, model='km05',
+                                       multiff=True)
+        fm = sv.epsff_from_observables({obs: 1 - h}, OBS_FID, model='km05',
+                                       multiff=True)
+        assert jac[obs] == pytest.approx((np.log(fp) - np.log(fm)) / (2 * h),
+                                         rel=1e-4)
+
+
+def test_mean_density_enters_only_threshold():
+    # d ln eps/d ln rho0 == -(d ln eps/d ln alpha_vir): pure threshold shift
+    jac_obs = sv.observable_jacobian(OBS_FID, model='km05', multiff=True)
+    jac_th = sv.jacobian(dict(OBS_FID, phi_x=1.12), model='km05', multiff=True,
+                         params=('alpha_vir',))
+    assert jac_obs['mean_density'] == pytest.approx(-jac_th['alpha_vir'],
+                                                    rel=1e-3)
+
+
+def test_velocity_less_leveraged_than_density():
+    # the sigma_v cancellation makes |elasticity_sigma_v| < |elasticity_rho0|
+    for model in ('km05', 'pn11'):
+        jac = sv.observable_jacobian(OBS_FID, model=model, multiff=True)
+        assert abs(jac['sigma_v']) < abs(jac['mean_density'])
+
+
+def test_uncertainty_budget_density_beats_velocity():
+    bud = sv.uncertainty_budget(OBS_FID, model='km05', multiff=True)
+    # with realistic errors, mean density contributes far more than velocity
+    assert bud['contribution']['mean_density'] > \
+        10 * bud['contribution']['sigma_v']
+    # variance shares sum to sigma^2
+    assert sum(bud['contribution'].values()) == \
+        pytest.approx(bud['sigma_ln_epsff'] ** 2)
+
+
+def test_montecarlo_density_wider_than_velocity():
+    mc_rho = sv.montecarlo_epsff(OBS_FID, model='km05',
+                                 observables=['mean_density'], n=4000, seed=1)
+    mc_v = sv.montecarlo_epsff(OBS_FID, model='km05', observables=['sigma_v'],
+                               n=4000, seed=2)
+    assert np.std(np.log10(mc_rho)) > 3 * np.std(np.log10(mc_v))
+
+
+def test_mass_volume_basis_volume_partially_cancels():
+    # in the mass/volume basis, |volume elasticity| < |mass elasticity|
+    # (rho_0 ~ V^-1 and R^2 ~ V^{2/3} dependences of alpha_vir partly cancel)
+    jac = sv.observable_jacobian(OBS_FID, model='km05', multiff=True,
+                                 basis='mass_volume')
+    assert abs(jac['volume']) < abs(jac['mass'])
+
+
+def test_unknown_observable_raises():
+    with pytest.raises(KeyError):
+        sv.epsff_from_observables({'nonsense': 1.1}, OBS_FID)
+
+
+# ---------------------------------------------------------------------------
 # log converters round-trip
 # ---------------------------------------------------------------------------
 def test_log_converters_roundtrip():

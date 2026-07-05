@@ -267,6 +267,179 @@ def _hopkins_tail_moment_wrap(sc, sg):
     return _hopkins_tail_moment(sc, sg, lam=1.5)
 
 
+# ---------------------------------------------------------------------------
+# Observable elasticities & error propagation (velocity vs mean density)
+# ---------------------------------------------------------------------------
+OBS_LABELS = {'mean_density': r'mean density $\rho_0$', 'radius': r'radius $R$',
+              'sigma_v': r'velocity disp. $\sigma_v$', 'c_s': r'sound speed $c_s$',
+              'b': r'driving $b$', 'mass': r'mass $M$', 'volume': r'volume $V$'}
+
+
+def fig_observable_tornado(fiducial=None, multiff=True, basis='density'):
+    """
+    d ln eps_ff / d ln X for each physical observable X, per s_crit model.
+
+    Shows the structural asymmetry: the mean density (mass) enters only the
+    threshold -> undamped; the velocity dispersion enters both the width and
+    the threshold -> cancels -> small.
+    """
+    if fiducial is None:
+        fiducial = dict(b=0.4, mach=10.0, alpha_vir=1.0)
+    order = [k for k in OBSERVABLE_ORDER(basis)]
+    models = ('km05', 'pn11', 'hc13')
+    jacs = {m: sv.observable_jacobian(fiducial, model=m, multiff=multiff,
+                                      basis=basis) for m in models}
+
+    y = np.arange(len(order))
+    h = 0.25
+    fig, ax = plt.subplots(figsize=(8, 5.0))
+    for i, m in enumerate(models):
+        vals = [jacs[m][o] for o in order]
+        ax.barh(y + (i - 1) * h, vals, height=h, color=MODEL_COLORS[m],
+                label=MODEL_LABELS[m])
+    ax.axvline(0, color='0.4', lw=0.8)
+    ax.set_yticks(y)
+    ax.set_yticklabels([OBS_LABELS[o] for o in order])
+    ax.invert_yaxis()
+    ax.set_xlabel(r'$d\ln\epsilon_{\rm ff} / d\ln X$  (signed elasticity)')
+    ax.set_title('Sensitivity of $\\epsilon_{\\rm ff}$ to physical observables '
+                 '(fiducial $b=0.4,\\ \\mathcal{M}=10,\\ \\alpha_{\\rm vir}=1$)')
+    ax.legend(frameon=False, fontsize=10, loc='lower right')
+    ax.text(0.02, 0.03,
+            r'$\rho_0$ (mass/vol.) enters only $s_{\rm crit}$ $\Rightarrow$ '
+            r'undamped;  $\sigma_v$ enters width $+$ threshold $\Rightarrow$ '
+            r'cancels', transform=ax.transAxes, ha='left', va='bottom',
+            fontsize=9, bbox=dict(boxstyle='round', fc='white', ec='0.7'))
+    return _save(fig, 'sensitivity_observable_tornado')
+
+
+def fig_uncertainty_budget(fiducial=None, ln_sigma=None, multiff=True,
+                           basis='density'):
+    """
+    Variance contribution of each observable to sigma(ln eps_ff), per model,
+    with realistic input uncertainties.  Mean density + size dominate the
+    *observational* budget; velocity is negligible.
+    """
+    if fiducial is None:
+        fiducial = dict(b=0.4, mach=10.0, alpha_vir=1.0)
+    order = [k for k in OBSERVABLE_ORDER(basis)]
+    models = ('km05', 'pn11', 'hc13')
+    buds = {m: sv.uncertainty_budget(fiducial, ln_sigma=ln_sigma, model=m,
+                                     multiff=multiff, basis=basis)
+            for m in models}
+
+    x = np.arange(len(models))
+    fig, ax = plt.subplots(figsize=(8, 5.0))
+    # stacked bars of sqrt(variance-contribution) is not additive; stack variance
+    bottom = np.zeros(len(models))
+    cmap = plt.get_cmap('tab10')
+    for j, o in enumerate(order):
+        vals = np.array([buds[m]['contribution'][o] for m in models])
+        ax.bar(x, vals, bottom=bottom, label=OBS_LABELS[o],
+               color=cmap(j % 10))
+        bottom += vals
+    ax.set_xticks(x)
+    ax.set_xticklabels([MODEL_LABELS[m] for m in models])
+    ax.set_ylabel(r'variance contribution to $\sigma^2_{\ln\epsilon_{\rm ff}}$')
+    tot = [buds[m]['sigma_ln_epsff'] for m in models]
+    for xi, m in zip(x, models):
+        ax.text(xi, bottom[list(models).index(m)] * 1.01,
+                r'$\sigma_{{\ln\epsilon}}={:.2f}$'.format(
+                    buds[m]['sigma_ln_epsff']), ha='center', va='bottom',
+                fontsize=9)
+    ax.set_title('$\\epsilon_{\\rm ff}$ uncertainty budget '
+                 '(realistic observational errors)')
+    ax.legend(frameon=False, fontsize=9, ncol=2, loc='upper right')
+    ax.margins(y=0.15)
+    return _save(fig, 'sensitivity_uncertainty_budget')
+
+
+def fig_elasticity_vs_regime(fiducial=None, multiff=True, model='km05'):
+    """
+    |d ln eps_ff / d ln X| vs eps_ff, sweeping alpha_vir to move deeper into the
+    tail.  The density/size sensitivities GROW toward the observed low-eps_ff
+    regime, while the velocity sensitivity stays small -- so exactly where the
+    theory is "tested", a tiny mass/volume error propagates most.
+    """
+    if fiducial is None:
+        fiducial = dict(b=0.4, mach=10.0, alpha_vir=1.0)
+    alpha_grid = np.logspace(-0.5, 1.6, 60)
+    eps = np.array([sv.epsff(fiducial['b'], fiducial['mach'], av, model=model,
+                             multiff=multiff, warn=False) for av in alpha_grid])
+    keys = ['mean_density', 'radius', 'sigma_v', 'c_s']
+    E = {k: [] for k in keys}
+    for av in alpha_grid:
+        j = sv.observable_jacobian(dict(fiducial, alpha_vir=av), model=model,
+                                   multiff=multiff, basis='density')
+        for k in keys:
+            E[k].append(abs(j[k]))
+
+    fig, ax = plt.subplots(figsize=(7.5, 5.0))
+    colors = {'mean_density': '#0072B2', 'radius': '#56B4E9',
+              'sigma_v': '#D55E00', 'c_s': '#E69F00'}
+    for k in keys:
+        ax.plot(eps, E[k], color=colors[k], lw=2.2, label=OBS_LABELS[k])
+    ax.axvspan(OBS_LO, OBS_HI, color='0.6', alpha=0.3, zorder=0)
+    ax.text(np.sqrt(OBS_LO * OBS_HI), ax.get_ylim()[1] * 0.9, 'observed',
+            ha='center', fontsize=9, color='0.3')
+    ax.set_xscale('log')
+    ax.invert_xaxis()  # deep tail (low eps_ff) to the right
+    ax.set_xlabel(r'$\epsilon_{\rm ff}$  (deeper tail $\rightarrow$)')
+    ax.set_ylabel(r'$|\,d\ln\epsilon_{\rm ff} / d\ln X\,|$')
+    ax.set_title('{}: observable sensitivities grow toward the observed '
+                 'regime'.format(MODEL_LABELS[model]))
+    ax.legend(frameon=False, fontsize=10, loc='upper left')
+    return _save(fig, 'sensitivity_elasticity_vs_regime')
+
+
+def fig_montecarlo_density_vs_velocity(fiducial=None, multiff=True,
+                                       model='km05', n=40000):
+    """
+    Monte-Carlo eps_ff distributions when ONLY the mean density is uncertain
+    vs ONLY the velocity dispersion (same realistic fractional errors), plus
+    the all-observables spread.  The density-only spread dwarfs the
+    velocity-only spread -- the money figure for the observational point.
+    """
+    if fiducial is None:
+        fiducial = dict(b=0.4, mach=10.0, alpha_vir=1.0)
+    mc_rho = sv.montecarlo_epsff(fiducial, model=model, multiff=multiff,
+                                 basis='density', observables=['mean_density'],
+                                 n=n, seed=1)
+    mc_v = sv.montecarlo_epsff(fiducial, model=model, multiff=multiff,
+                               basis='density', observables=['sigma_v'],
+                               n=n, seed=2)
+    mc_all = sv.montecarlo_epsff(fiducial, model=model, multiff=multiff,
+                                 basis='density', n=n, seed=3)
+    eps0 = sv.epsff(fiducial['b'], fiducial['mach'], fiducial['alpha_vir'],
+                    model=model, multiff=multiff, warn=False)
+
+    fig, ax = plt.subplots(figsize=(7.5, 5.0))
+    bins = np.linspace(-4, 0.5, 80)
+    for data, color, lab, sd in (
+            (mc_v, '#D55E00', r'$\sigma_v$ only ($\sigma_{\ln}=0.1$)', np.std(np.log10(mc_v))),
+            (mc_rho, '#0072B2', r'$\rho_0$ only ($\sigma_{\ln}=0.5$)', np.std(np.log10(mc_rho))),
+            (mc_all, '0.4', 'all observables', np.std(np.log10(mc_all)))):
+        ax.hist(np.log10(data), bins=bins, histtype='stepfilled', alpha=0.45,
+                color=color, density=True,
+                label='{}  ($\\Delta={:.2f}$ dex)'.format(lab, sd))
+    ax.axvline(np.log10(eps0), color='k', lw=1.0, ls='--')
+    ax.axvspan(np.log10(OBS_LO), np.log10(OBS_HI), color='green', alpha=0.12,
+               zorder=0)
+    ax.set_xlabel(r'$\log_{10}\,\epsilon_{\rm ff}$')
+    ax.set_ylabel('probability density')
+    ax.set_title('{}: a small mean-density (mass/volume) error dominates the '
+                 '$\\epsilon_{{\\rm ff}}$ spread'.format(MODEL_LABELS[model]))
+    ax.legend(frameon=False, fontsize=9.5, loc='upper left')
+    return _save(fig, 'sensitivity_montecarlo_density_vs_velocity')
+
+
+def OBSERVABLE_ORDER(basis):
+    """Display order of observables for a basis (b last: it's a theory param)."""
+    if basis == 'mass_volume':
+        return ['mass', 'volume', 'sigma_v', 'c_s', 'b']
+    return ['mean_density', 'radius', 'sigma_v', 'c_s', 'b']
+
+
 def make_all():
     """Regenerate every figure; returns the list of saved PNG paths."""
     paths = [
@@ -274,6 +447,10 @@ def make_all():
         fig_elasticity_heatmap(multiff=False),
         fig_tornado(multiff=True),
         fig_envelope_hopkins(model='km05'),
+        fig_observable_tornado(),
+        fig_uncertainty_budget(),
+        fig_elasticity_vs_regime(),
+        fig_montecarlo_density_vs_velocity(),
     ]
     return paths
 
